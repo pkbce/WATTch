@@ -1,0 +1,38 @@
+{
+  "WATTch": {
+    "ESP1": {
+      "power": 109,
+      "relay": true
+    },
+    "ESP2": {
+      "power": 0,
+      "relay": false
+    },
+    "ESP3": {
+      "power": 0,
+      "relay": false
+    },
+    "ESP4": {
+      "power": 0,
+      "relay": true
+    },
+    "Total Usage": {
+      "total_1D": {
+        "cost": 0,
+        "kWh": 0
+      },
+      "total_1M": {
+        "cost": 0,
+        "kWh": 0
+      },
+      "total_1W": {
+        "cost": 44.13,
+        "kWh": 2.851
+      }
+    },
+    "WiFi": {
+      "SSID": "free wif",
+      "password": 123456
+    }
+  }
+}

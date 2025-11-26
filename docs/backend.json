@@ -1,0 +1,182 @@
+
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the WATTch application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user."
+        },
+        "googleId": {
+          "type": "string",
+          "description": "Google ID of the user, obtained during Google Sign-In."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the user."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the user."
+        }
+      },
+      "required": [
+        "id",
+        "email"
+      ]
+    },
+    "Load": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Load",
+      "type": "object",
+      "description": "Represents an electricity load being monitored.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the load."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who owns this load. (Relationship: User 1:N Load)"
+        },
+        "loadType": {
+          "type": "string",
+          "description": "Type of load (light, medium, heavy, universal)."
+        },
+        "name": {
+          "type": "string",
+          "description": "Custom name given to the load."
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Indicates if the load is currently active."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "loadType"
+      ]
+    },
+    "ElectricityData": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ElectricityData",
+      "type": "object",
+      "description": "Represents electricity data readings for a specific load.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the electricity data entry."
+        },
+        "loadId": {
+          "type": "string",
+          "description": "Reference to the Load this data belongs to. (Relationship: Load 1:N ElectricityData)"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of when the data was recorded.",
+          "format": "date-time"
+        },
+        "voltage": {
+          "type": "number",
+          "description": "Voltage reading."
+        },
+        "current": {
+          "type": "number",
+          "description": "Current reading."
+        },
+        "power": {
+          "type": "number",
+          "description": "Power reading."
+        }
+      },
+      "required": [
+        "id",
+        "loadId",
+        "timestamp",
+        "voltage",
+        "current",
+        "power"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile information, including Google Sign-In details. Uses path-based ownership for user data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "Unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/loads/{loadId}",
+        "definition": {
+          "entityName": "Load",
+          "schema": {
+            "$ref": "#/backend/entities/Load"
+          },
+          "description": "Stores information about each load owned by a user. Implements path-based ownership. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "Unique identifier for the user who owns the load."
+            },
+            {
+              "name": "loadId",
+              "description": "Unique identifier for the load."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/loads/{loadId}/electricityData/{electricityDataId}",
+        "definition": {
+          "entityName": "ElectricityData",
+          "schema": {
+            "$ref": "#/backend/entities/ElectricityData"
+          },
+          "description": "Stores electricity data readings for a specific load. Implements nested path-based ownership. Includes denormalized 'userId' and 'loadId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "Unique identifier for the user who owns the load."
+            },
+            {
+              "name": "loadId",
+              "description": "Unique identifier for the load."
+            },
+            {
+              "name": "electricityDataId",
+              "description": "Unique identifier for the electricity data entry."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "This Firestore data structure is designed to support the WATTch application, focusing on electricity monitoring with real-time data display. The structure leverages path-based ownership for user data and nested resources to ensure secure and scalable data management. Google Sign-In integration is accommodated through the `googleId` field within the `User` entity. Authorization independence is achieved by using path-based ownership (`/users/{userId}`) which obviates the need for complex `get()` calls in security rules. The design supports the required QAPs through structural segregation; each collection is homogeneous, simplifying security rules, and list operations are secured via path-based ownership."
+  }
+}

@@ -1,0 +1,159 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict user-ownership model. All user-generated
+ * data, including loads and their corresponding electricity readings, is nested under a
+ * specific user's document. This ensures that a user can only ever access their own data.
+ *
+ * Data Structure: Data is organized hierarchically under the `/users/{userId}` path.
+ * This structure includes a user's profile, their monitored loads in a `loads` subcollection,
+ * and time-series data for each load in a nested `electricityData` subcollection.
+ *
+ * Key Security Decisions:
+ * - All access requires user authentication. There is no public data.
+ * - Users can create their own profile document but cannot see or interact with other users' data.
+ * - Listing documents is only permitted within a user's own data tree.
+ * - The default security posture is deny-all; access is only granted through explicit rules.
+ *
+ * Denormalization for Authorization: The security model relies on path-based ownership
+ * (`/users/{userId}/...`). This is the most performant and secure method as it avoids
+ * costly cross-document `get()` calls in rules. To ensure data integrity, key identifiers
+ * (`userId`, `loadId`) are also stored within the documents themselves and validated against
+ * the path on creation and prevented from changing on update.
+ *
+ * Structural Segregation: Each user's data is strictly segregated under their own
+ * unique path (`/users/{userId}`). This pattern naturally prevents data leakage between users
+ * and simplifies security rules for list operations, as queries are inherently scoped to the
+ * authenticated user.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the authenticated user's UID matches the provided userId.
+     * This is the foundation of the user-ownership model.
+     * @param userId The UID to check against the authenticated user.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks for ownership on an existing document. Used for update/delete
+     * to prevent operations on documents that do not exist.
+     * @param userId The UID to check against the authenticated user.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Validates required fields for creating a new User document.
+     * Enforces consistency between the path and the document's internal `id`.
+     */
+    function hasValidUserData(userId) {
+      return request.resource.data.id == userId;
+    }
+
+    /**
+     * Ensures the core relational identifier of a User document cannot be changed.
+     */
+    function isUserDataImmutable() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    /**
+     * Validates required fields for creating a new Load document.
+     * Enforces consistency between the path and denormalized `userId` and `id`.
+     */
+    function hasValidLoadData(userId, loadId) {
+      return request.resource.data.userId == userId
+          && request.resource.data.id == loadId;
+    }
+
+    /**
+     * Ensures the core relational identifiers of a Load document cannot be changed.
+     */
+    function isLoadDataImmutable() {
+      return request.resource.data.userId == resource.data.userId
+          && request.resource.data.id == resource.data.id;
+    }
+
+    /**
+     * Validates required fields for creating new ElectricityData.
+     * Enforces consistency between the path and denormalized `loadId` and `id`.
+     */
+    function hasValidElectricityData(loadId, electricityDataId) {
+      return request.resource.data.loadId == loadId
+          && request.resource.data.id == electricityDataId;
+    }
+
+    /**
+     * Ensures the core relational identifiers of an ElectricityData document cannot be changed.
+     */
+    function isElectricityDataImmutable() {
+      return request.resource.data.loadId == resource.data.loadId
+          && request.resource.data.id == resource.data.id;
+    }
+
+
+    // ------------------------------------------------------------------------
+    // Collection Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Manages user profile documents.
+     * @path /users/{userId}
+     * @allow A user (create)s their own profile document where `request.auth.uid` matches `{userId}`.
+     * @deny An authenticated user (update)s another user's profile document.
+     * @principle Restricts access to a user's own data tree and allows self-creation of a profile.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Disallow listing all users for security and privacy.
+      allow create: if isOwner(userId) && hasValidUserData(userId);
+      allow update: if isExistingOwner(userId) && isUserDataImmutable();
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Manages the loads (e.g., appliances) owned by a user.
+       * @path /users/{userId}/loads/{loadId}
+       * @allow An authenticated user (create)s a new load document under their own user path.
+       * @deny An authenticated user (get)s a load document owned by another user.
+       * @principle Enforces document ownership for all operations within a user-specific subcollection.
+       */
+      match /loads/{loadId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && hasValidLoadData(userId, loadId);
+        allow update: if isExistingOwner(userId) && isLoadDataImmutable();
+        allow delete: if isExistingOwner(userId);
+
+        /**
+         * @description Manages time-series electricity data for a specific load.
+         * @path /users/{userId}/loads/{loadId}/electricityData/{electricityDataId}
+         * @allow An authenticated user (list)s all electricity data for one of their own loads.
+         * @deny An authenticated user (delete)s electricity data under another user's load.
+         * @principle Enforces inherited document ownership in a deeply nested subcollection.
+         */
+        match /electricityData/{electricityDataId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId) && hasValidElectricityData(loadId, electricityDataId);
+          allow update: if isExistingOwner(userId) && isElectricityDataImmutable();
+          allow delete: if isExistingOwner(userId);
+        }
+      }
+    }
+  }
+}
