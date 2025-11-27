@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,6 +7,8 @@ import { z } from 'zod';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
+import { Loader2 } from 'lucide-react';
+import { useLaravelAuth } from '@/components/LaravelAuthContext';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -67,6 +68,8 @@ export default function SignupPage() {
   const [isClient, setIsClient] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const { setUser, setToken } = useLaravelAuth();
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -83,9 +86,10 @@ export default function SignupPage() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsLoading(true);
     try {
       // 1. Register User
-      const registerResponse = await fetch('https://jwt-prod.up.railway.app/api/auth/register', {
+      const registerResponse = await fetch('http://127.0.0.1:8000/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -103,7 +107,7 @@ export default function SignupPage() {
 
       // 2. Create Database
       // 1.5 Login to get token for create_db
-      const loginResponse = await fetch('https://jwt-prod.up.railway.app/api/auth/login', {
+      const loginResponse = await fetch('http://127.0.0.1:8000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -120,7 +124,7 @@ export default function SignupPage() {
       const token = loginData.access_token;
 
       // 2. Create Database
-      const createDbResponse = await fetch('https://jwt-prod.up.railway.app/api/create_db', {
+      const createDbResponse = await fetch('http://127.0.0.1:8000/api/create_db', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -147,13 +151,15 @@ export default function SignupPage() {
 
       router.push('/login');
 
-    } catch (error: any) {
-      console.error("Registration error:", error);
+    } catch (error) {
+      console.error('Signup Error', error);
       toast({
-        variant: "destructive",
-        title: "Registration Failed",
-        description: error.message || "Something went wrong.",
+        variant: 'destructive',
+        title: 'Signup Failed',
+        description: (error as Error).message,
       });
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -234,8 +240,15 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full">
-                Create account
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating account...
+                  </>
+                ) : (
+                  'Create account'
+                )}
               </Button>
             </form>
           </Form>

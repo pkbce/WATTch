@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { useLaravelAuth } from '@/components/LaravelAuthContext';
 
 import { Button } from '@/components/ui/button';
@@ -57,19 +58,20 @@ const Logo = () => (
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated, isLoading } = useLaravelAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useLaravelAuth();
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
+    if (!authLoading && isAuthenticated) {
       router.push('/');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, authLoading, router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -80,8 +82,9 @@ export default function LoginPage() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsLoading(true);
     try {
-      const response = await fetch('https://jwt-prod.up.railway.app/api/auth/login', {
+      const response = await fetch('http://127.0.0.1:8000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
@@ -100,7 +103,7 @@ export default function LoginPage() {
       const token = data.access_token;
 
       // Fetch user profile
-      const profileResponse = await fetch('https://jwt-prod.up.railway.app/api/auth/profile', {
+      const profileResponse = await fetch('http://127.0.0.1:8000/api/auth/profile', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -128,10 +131,12 @@ export default function LoginPage() {
         title: "Login Failed",
         description: error.message || "Please check your credentials.",
       });
+    } finally {
+      setIsLoading(false);
     }
   }
 
-  if (!isClient || isLoading || isAuthenticated) {
+  if (!isClient || authLoading || isAuthenticated) {
     return null;
   }
 
@@ -191,8 +196,15 @@ export default function LoginPage() {
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="w-full">
-                      Login
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Logging in...
+                        </>
+                      ) : (
+                        'Login'
+                      )}
                     </Button>
                   </form>
                 </Form>

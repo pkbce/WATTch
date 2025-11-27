@@ -106,10 +106,10 @@ export function DashboardClient() {
     const fetchSockets = async () => {
       try {
         const [ll, ml, hl, ul] = await Promise.all([
-          fetch(`https://jwt-prod.up.railway.app/api/ll_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
-          fetch(`https://jwt-prod.up.railway.app/api/ml_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
-          fetch(`https://jwt-prod.up.railway.app/api/hl_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
-          fetch(`https://jwt-prod.up.railway.app/api/ul_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/ll_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/ml_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/hl_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/ul_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
         ]);
 
         // Map Laravel data to Socket interface
@@ -206,7 +206,7 @@ export function DashboardClient() {
         loadType === 'heavy' ? 'hl_add_socket' : 'ul_add_socket';
 
     try {
-      await fetch(`https://jwt-prod.up.railway.app/api/${endpoint}`, {
+      await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -251,7 +251,7 @@ export function DashboardClient() {
         loadType === 'heavy' ? 'hl_delete_row' : 'ul_delete_row';
 
     try {
-      await fetch(`https://jwt2-production.up.railway.app/api/${endpoint}`, {
+      await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
         method: 'DELETE', // Laravel route says DELETE
         headers: {
           'Content-Type': 'application/json',
@@ -299,7 +299,7 @@ export function DashboardClient() {
       loadType === 'medium' ? 'ml_change_power_status' :
         loadType === 'heavy' ? 'hl_change_power_status' : 'ul_change_power_status';
 
-    await fetch(`https://jwt-prod.up.railway.app/api/${endpoint}`, {
+    await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -324,7 +324,7 @@ export function DashboardClient() {
       loadType === 'medium' ? 'ml_change_socket_name' :
         loadType === 'heavy' ? 'hl_change_socket_name' : 'ul_change_socket_name';
 
-    await fetch(`https://jwt-prod.up.railway.app/api/${endpoint}`, {
+    await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -361,7 +361,7 @@ export function DashboardClient() {
         loadType === 'heavy' ? 'hl_reset_consumption' : 'ul_reset_consumption';
 
     try {
-      await fetch(`https://jwt-prod.up.railway.app/api/${endpoint}`, {
+      await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -427,7 +427,7 @@ export function DashboardClient() {
           const updateConsumption = (socketId: string, power: number) => {
             if (!user) return;
 
-            fetch(`https://jwt-prod.up.railway.app/api/consumption/sync-firebase`, {
+            fetch(`http://127.0.0.1:8000/api/consumption/sync-firebase`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

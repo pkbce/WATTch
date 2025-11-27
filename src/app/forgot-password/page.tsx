@@ -5,8 +5,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { sendPasswordResetEmail } from 'firebase/auth';
-import { useAuth } from '@/firebase';
+import { useState } from 'react';
+import { Loader2 } from 'lucide-react';
+
 
 import { Button } from '@/components/ui/button';
 import {
@@ -34,28 +35,29 @@ const formSchema = z.object({
 });
 
 const Logo = () => (
-    <svg
-      width="24"
-      height="24"
-      viewBox="0 0 40 40"
-      fill="hsl(var(--primary))"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M23.3334 3.33331L6.66675 21.6666H20L16.6667 36.6666L33.3334 18.3333H20L23.3334 3.33331Z"
-        stroke="hsl(var(--primary))"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 40 40"
+    fill="hsl(var(--primary))"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M23.3334 3.33331L6.66675 21.6666H20L16.6667 36.6666L33.3334 18.3333H20L23.3334 3.33331Z"
+      stroke="hsl(var(--primary))"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
-  const auth = useAuth();
+
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -65,14 +67,27 @@ export default function ForgotPasswordPage() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!auth) return;
+    setIsLoading(true);
     try {
-      await sendPasswordResetEmail(auth, values.email);
-      toast({
-        title: 'Password Reset Email Sent',
-        description: 'Please check your inbox for password reset instructions.',
+      const response = await fetch('http://127.0.0.1:8000/api/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ email: values.email }),
       });
-      router.push('/login');
+
+      if (response.ok) {
+        toast({
+          title: 'Password Reset Email Sent',
+          description: 'Please check your inbox for password reset instructions.',
+        });
+        router.push('/login');
+      } else {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to send reset email.');
+      }
     } catch (error) {
       console.error('Password Reset Error', error);
       toast({
@@ -80,12 +95,14 @@ export default function ForgotPasswordPage() {
         title: 'Password Reset Failed',
         description: (error as Error).message,
       });
+    } finally {
+      setIsLoading(false);
     }
   }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-       <div className="absolute top-8 left-8">
+      <div className="absolute top-8 left-8">
         <div className="flex items-center gap-2 text-foreground">
           <Logo />
           <span className="font-bold text-[23px] font-space">WATTch</span>
@@ -117,12 +134,19 @@ export default function ForgotPasswordPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full">
-                Send Reset Email
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Send Reset Email'
+                )}
               </Button>
             </form>
           </Form>
-          
+
           <div className="mt-4 text-center text-sm">
             <Link href="/login" className="underline">
               Back to login
