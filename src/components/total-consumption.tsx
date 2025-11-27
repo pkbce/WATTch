@@ -86,13 +86,20 @@ export function TotalConsumption({ rate }: { rate: number }) {
       return chartPoint;
     });
 
+    // Ensure unique time points to prevent key errors
+    const uniqueTimePoints = timePoints.filter((point, index, self) =>
+      index === self.findIndex((t) => t.time === point.time)
+    );
+
     return {
-      '1D': timePoints,
-      '1W': timePoints,
-      '1M': timePoints,
-      '1Y': timePoints,
+      '1D': uniqueTimePoints,
+      '1W': uniqueTimePoints,
+      '1M': uniqueTimePoints,
+      '1Y': uniqueTimePoints,
     };
   }, [consumptionData]);
+
+  console.log('TotalConsumption chartData:', chartData[interval]);
 
   const billData = useMemo(() => {
     const data = chartData[interval];
@@ -168,7 +175,7 @@ export function TotalConsumption({ rate }: { rate: number }) {
                       config={{ [load]: chartConfig[load] }}
                       className="w-full h-[200px]"
                     >
-                      <BarChart accessibilityLayer data={chartData[interval]}>
+                      <BarChart data={chartData[interval]}>
                         <XAxis
                           dataKey="time"
                           tickLine={false}

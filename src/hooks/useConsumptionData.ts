@@ -19,7 +19,7 @@ interface ConsumptionData {
 }
 
 export function useConsumptionData(interval: Interval) {
-    const { user } = useLaravelAuth();
+    const { user, token } = useLaravelAuth();
     const [data, setData] = useState<ConsumptionData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -36,7 +36,13 @@ export function useConsumptionData(interval: Interval) {
 
             try {
                 const response = await fetch(
-                    `http://127.0.0.1:8000/api/consumption/history?name=${user.name}&interval=${interval}`
+                    `https://jwt-prod.up.railway.app/api/consumption/history?interval=${interval}`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        }
+                    }
                 );
 
                 if (!response.ok) {

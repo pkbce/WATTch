@@ -106,10 +106,10 @@ export function DashboardClient() {
     const fetchSockets = async () => {
       try {
         const [ll, ml, hl, ul] = await Promise.all([
-          fetch(`http://127.0.0.1:8000/api/ll_db_route?name=${user.name}`).then(res => res.json()),
-          fetch(`http://127.0.0.1:8000/api/ml_db_route?name=${user.name}`).then(res => res.json()),
-          fetch(`http://127.0.0.1:8000/api/hl_db_route?name=${user.name}`).then(res => res.json()),
-          fetch(`http://127.0.0.1:8000/api/ul_db_route?name=${user.name}`).then(res => res.json()),
+          fetch(`https://jwt-prod.up.railway.app/api/ll_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`https://jwt-prod.up.railway.app/api/ml_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`https://jwt-prod.up.railway.app/api/hl_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`https://jwt-prod.up.railway.app/api/ul_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
         ]);
 
         // Map Laravel data to Socket interface
@@ -206,10 +206,13 @@ export function DashboardClient() {
         loadType === 'heavy' ? 'hl_add_socket' : 'ul_add_socket';
 
     try {
-      await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
+      await fetch(`https://jwt-prod.up.railway.app/api/${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: user.name, socket_id: id, socket_name: name }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ socket_id: id, socket_name: name }),
       });
       // Refresh sockets
       // For now, just reload page or re-fetch. Re-fetching is better but complex to trigger from here without extracting fetch logic.
@@ -248,10 +251,13 @@ export function DashboardClient() {
         loadType === 'heavy' ? 'hl_delete_row' : 'ul_delete_row';
 
     try {
-      await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
+      await fetch(`https://jwt2-production.up.railway.app/api/${endpoint}`, {
         method: 'DELETE', // Laravel route says DELETE
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: user.name, socket_id: socketId }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ socket_id: socketId }),
       });
       setSockets(prev => ({
         ...prev,
@@ -293,10 +299,13 @@ export function DashboardClient() {
       loadType === 'medium' ? 'ml_change_power_status' :
         loadType === 'heavy' ? 'hl_change_power_status' : 'ul_change_power_status';
 
-    await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
+    await fetch(`https://jwt-prod.up.railway.app/api/${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: user.name, socket_id: socketId, power_status: newStatus ? 1 : 0 }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ socket_id: socketId, power_status: newStatus ? 1 : 0 }),
     });
   }
 
@@ -315,10 +324,13 @@ export function DashboardClient() {
       loadType === 'medium' ? 'ml_change_socket_name' :
         loadType === 'heavy' ? 'hl_change_socket_name' : 'ul_change_socket_name';
 
-    await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
+    await fetch(`https://jwt-prod.up.railway.app/api/${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: user.name, socket_id: socketId, socket_name: newName }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ socket_id: socketId, socket_name: newName }),
     });
 
     setSockets(prevSockets => {
@@ -349,10 +361,13 @@ export function DashboardClient() {
         loadType === 'heavy' ? 'hl_reset_consumption' : 'ul_reset_consumption';
 
     try {
-      await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
+      await fetch(`https://jwt-prod.up.railway.app/api/${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: user.name, socket_id: socketId }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ socket_id: socketId }),
       });
       // Update local state to 0
       setSockets(prevSockets => {
@@ -412,9 +427,14 @@ export function DashboardClient() {
           const updateConsumption = (socketId: string, power: number) => {
             if (!user) return;
 
-            fetch(`http://127.0.0.1:8000/api/consumption/sync-firebase`, {
+            fetch(`https://jwt-prod.up.railway.app/api/consumption/sync-firebase`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                // Note: sync-firebase is NOT authenticated in api.php yet to support Node service
+                // But if we wanted to support it from frontend, we could add auth.
+                // For now, we keep sending 'name' because the route expects it (it's not in auth:api group)
+              },
               body: JSON.stringify({
                 name: user.name,
                 load_type: loadType, // 'light', 'medium', 'heavy', 'universal'
@@ -422,7 +442,7 @@ export function DashboardClient() {
                 power: power, // Current power in Watts
                 duration_seconds: 1 // How long this reading lasted (1 second intervals)
               }),
-            }).catch(e => console.error("Update consumption failed", e));
+            })
           };
 
           // Check if this is the first load for this ESP device or first sync
@@ -451,32 +471,34 @@ export function DashboardClient() {
             return;
           }
 
-          // Always update current state
+          // Always update current state only for this load type
           const previousRealPower = lastReadings.current[espId];
-          const hasChanged = incomingPower !== previousRealPower || isPoweredOn !== newSockets[loadType][0].isPoweredOn;
+          const powerChanged = incomingPower !== previousRealPower;
+          const relayChanged = isPoweredOn !== newSockets[loadType][0].isPoweredOn;
+          const hasChanged = powerChanged || relayChanged;
 
           if (hasChanged) {
             lastReadings.current[espId] = incomingPower;
           }
 
-          // Update all sockets in this load type
           newSockets[loadType] = newSockets[loadType].map(socket => {
+            let newData = socket.data;
+            // Add a new data point on every update, but skip if it's a duplicate of the last value
+            const isDuplicate = socket.data.length > 0 && socket.data[socket.data.length - 1].consumption === incomingPower;
+            if (!isDuplicate) {
+              const newDataPoint = {
+                time: new Date().toLocaleTimeString(),
+                consumption: incomingPower
+              };
+              newData = [...socket.data, newDataPoint];
+              if (newData.length > 15) {
+                newData = newData.slice(newData.length - 15);
+              }
+            }
             // Update Laravel with new consumption for each socket if power changed
-            if (incomingPower !== previousRealPower) {
+            if (powerChanged) {
               updateConsumption(socket.id, incomingPower);
             }
-
-            // Add data point to chart when power changes
-            const newDataPoint = {
-              time: new Date().toLocaleTimeString(),
-              consumption: incomingPower
-            };
-
-            let newData = [...socket.data, newDataPoint];
-            if (newData.length > 15) {
-              newData = newData.slice(newData.length - 15);
-            }
-
             return {
               ...socket,
               isPoweredOn,

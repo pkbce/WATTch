@@ -4,73 +4,72 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use mysqli;
+use PDO;
+use PDOException;
 
 class ConsumptionController extends Controller
 {
-    /**
-     * Get aggregated consumption data for charts
-     * Aggregates data from all four load tables
-     */
-    public function getConsumptionData(Request $request)
+    private function getDbConnection()
     {
-        $db_name = $request->input('name');
-        $interval = $request->input('interval', '1D'); // 1D, 1W, 1M, 1Y
-
-        if (!$db_name) {
-            return response()->json(['error' => 'Database name is required'], 400);
+        try {
+            $dbPath = database_path('database.sqlite');
+            $pdo = new PDO('sqlite:' . $dbPath);
+            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            return $pdo;
+        } catch (PDOException $e) {
+            return null;
         }
-
-        $conn = new mysqli("localhost", "root", "", $db_name);
-
-        if ($conn->connect_error) {
-            return response()->json(['error' => 'Connection failed: ' . $conn->connect_error], 500);
-        }
-
-        // Get data from all four tables
-        $loads = ['light_loads', 'medium_loads', 'heavy_loads', 'universal_loads'];
-        $aggregatedData = [
-            'light' => 0,
-            'medium' => 0,
-            'heavy' => 0,
-            'universal' => 0,
-        ];
-
-        $field = $this->getFieldForInterval($interval);
-
-        foreach ($loads as $index => $table) {
-            $query = "SELECT SUM({$field}) as total FROM `{$table}`";
-            $result = $conn->query($query);
-            
-            if ($result && $result->num_rows > 0) {
-                $row = $result->fetch_assoc();
-                $loadType = ['light', 'medium', 'heavy', 'universal'][$index];
-                $aggregatedData[$loadType] = (int)($row['total'] ?? 0);
-            }
-        }
-
-        $conn->close();
-
-        return response()->json([
-            'interval' => $interval,
-            'data' => $aggregatedData,
-            'timestamp' => now()->toIso8601String()
-        ]);
     }
 
-    /**
-     * Sync Firebase data to database
-     * Receives power readings from Firebase and updates consumption
-     */
+    public function getConsumptionData(Request $request)
+    {
+        $interval = $request->input('interval', '1D');
+
+        $conn = $this->getDbConnection();
+
+        if (!$conn) {
+            return response()->json(['error' => 'Database connection failed'], 500);
+        }
+
+        try {
+            $loads = ['light_loads', 'medium_loads', 'heavy_loads', 'universal_loads'];
+            $aggregatedData = [
+                'light' => 0,
+                'medium' => 0,
+                'heavy' => 0,
+                'universal' => 0,
+            ];
+
+            $field = $this->getFieldForInterval($interval);
+
+            foreach ($loads as $index => $table) {
+                $query = "SELECT SUM({$field}) as total FROM {$table}";
+                $stmt = $conn->prepare($query);
+                $stmt->execute();
+                $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                $loadType = ['light', 'medium', 'heavy', 'universal'][$index];
+                $aggregatedData[$loadType] = (int) ($result['total'] ?? 0);
+            }
+
+            return response()->json([
+                'interval' => $interval,
+                'data' => $aggregatedData,
+                'timestamp' => now()->toIso8601String()
+            ]);
+        } catch (PDOException $e) {
+            return response()->json(['error' => 'Query failed: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function syncFirebaseData(Request $request)
     {
-        $db_name = $request->input('name');
-        $load_type = $request->input('load_type'); // 'light', 'medium', 'heavy', 'universal'
+        $load_type = $request->input('load_type');
         $socket_id = $request->input('socket_id');
         $power = $request->input('power', 0);
-        $duration_seconds = $request->input('duration_seconds', 60); // How long this reading lasted
+        $duration_seconds = $request->input('duration_seconds', 60);
 
-        if (!$db_name || !$load_type || !$socket_id) {
+        if (!$load_type || !$socket_id) {
             return response()->json(['error' => 'Missing required fields'], 400);
         }
 
@@ -79,43 +78,33 @@ class ConsumptionController extends Controller
             return response()->json(['error' => 'Invalid load type'], 400);
         }
 
-        $conn = new mysqli("localhost", "root", "", $db_name);
+        $conn = $this->getDbConnection();
 
-        if ($conn->connect_error) {
-            return response()->json(['error' => 'Connection failed: ' . $conn->connect_error], 500);
+        if (!$conn) {
+            return response()->json(['error' => 'Database connection failed'], 500);
         }
 
-        // Calculate energy consumed in this period (Watt-seconds to Watt-hours)
-        $watt_hours = ($power * $duration_seconds) / 3600;
-        $wh_int = (int)($watt_hours * 1000); // Store as integer with precision
-        
-        // Get current time buckets
-        $hourBucket = $this->getCurrentTimeBucket();
-        $dayBucket = $this->getCurrentDayBucket();
-        $weekBucket = $this->getCurrentWeekBucket();
-        $monthBucket = $this->getCurrentMonthBucket();
-        
-        // Update all time buckets
-        $stmt = $conn->prepare("
-            UPDATE `{$table}` 
-            SET 
-                `{$hourBucket}` = `{$hourBucket}` + ?,
-                `{$dayBucket}` = `{$dayBucket}` + ?,
-                `{$weekBucket}` = `{$weekBucket}` + ?,
-                `{$monthBucket}` = `{$monthBucket}` + ?
-            WHERE `socket_id` = ?
-        ");
+        try {
+            $watt_hours = ($power * $duration_seconds) / 3600;
+            $wh_int = (int) ($watt_hours * 1000);
 
-        if (!$stmt) {
-            $conn->close();
-            return response()->json(['error' => 'Prepare failed: ' . $conn->error], 500);
-        }
+            $hourBucket = $this->getCurrentTimeBucket();
+            $dayBucket = $this->getCurrentDayBucket();
+            $weekBucket = $this->getCurrentWeekBucket();
+            $monthBucket = $this->getCurrentMonthBucket();
 
-        $stmt->bind_param("iiiis", $wh_int, $wh_int, $wh_int, $wh_int, $socket_id);
+            $stmt = $conn->prepare("
+                UPDATE {$table}
+                SET
+                    {$hourBucket} = {$hourBucket} + ?,
+                    {$dayBucket} = {$dayBucket} + ?,
+                    {$weekBucket} = {$weekBucket} + ?,
+                    {$monthBucket} = {$monthBucket} + ?
+                WHERE socket_id = ?
+            ");
 
-        if ($stmt->execute()) {
-            $stmt->close();
-            $conn->close();
+            $stmt->execute([$wh_int, $wh_int, $wh_int, $wh_int, $socket_id]);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Consumption updated',
@@ -127,115 +116,96 @@ class ConsumptionController extends Controller
                     'month' => $monthBucket
                 ]
             ]);
-        } else {
-            $error = $stmt->error;
-            $stmt->close();
-            $conn->close();
-            return response()->json(['error' => 'Update failed: ' . $error], 500);
+        } catch (PDOException $e) {
+            return response()->json(['error' => 'Update failed: ' . $e->getMessage()], 500);
         }
     }
 
-    /**
-     * Get consumption history for charts with time buckets
-     */
     public function getConsumptionHistory(Request $request)
     {
-        $db_name = $request->input('name');
         $interval = $request->input('interval', '1D');
 
-        if (!$db_name) {
-            return response()->json(['error' => 'Database name is required'], 400);
+        $conn = $this->getDbConnection();
+
+        if (!$conn) {
+            return response()->json(['error' => 'Database connection failed'], 500);
         }
 
-        $conn = new mysqli("localhost", "root", "", $db_name);
+        try {
+            $loads = ['light_loads', 'medium_loads', 'heavy_loads', 'universal_loads'];
+            $loadTypes = ['light', 'medium', 'heavy', 'universal'];
 
-        if ($conn->connect_error) {
-            return response()->json(['error' => 'Connection failed: ' . $conn->connect_error], 500);
-        }
+            $fields = $this->getFieldsForInterval($interval);
+            $timeLabels = $this->getTimeLabelsForInterval($interval);
 
-        $loads = ['light_loads', 'medium_loads', 'heavy_loads', 'universal_loads'];
-        $loadTypes = ['light', 'medium', 'heavy', 'universal'];
-        
-        $fields = $this->getFieldsForInterval($interval);
-        $timeLabels = $this->getTimeLabelsForInterval($interval);
-        
-        // Build chart data structure
-        $chartData = [];
-        
-        foreach ($loadTypes as $index => $loadType) {
-            $table = $loads[$index];
-            $chartData[$loadType] = [];
-            
-            foreach ($fields as $i => $field) {
-                $query = "SELECT SUM(`{$field}`) as total FROM `{$table}`";
-                $result = $conn->query($query);
-                
-                $value = 0;
-                if ($result && $result->num_rows > 0) {
-                    $row = $result->fetch_assoc();
-                    $value = (int)($row['total'] ?? 0);
+            $chartData = [];
+
+            foreach ($loadTypes as $index => $loadType) {
+                $table = $loads[$index];
+                $chartData[$loadType] = [];
+
+                foreach ($fields as $i => $field) {
+                    $query = "SELECT SUM({$field}) as total FROM {$table}";
+                    $stmt = $conn->prepare($query);
+                    $stmt->execute();
+                    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                    $value = (int) ($result['total'] ?? 0);
+
+                    $chartData[$loadType][] = [
+                        'time' => $timeLabels[$i],
+                        'value' => $value
+                    ];
                 }
-                
-                $chartData[$loadType][] = [
-                    'time' => $timeLabels[$i],
-                    'value' => $value
-                ];
             }
+
+            return response()->json([
+                'interval' => $interval,
+                'data' => $chartData
+            ]);
+        } catch (PDOException $e) {
+            return response()->json(['error' => 'Query failed: ' . $e->getMessage()], 500);
         }
-
-        $conn->close();
-
-        return response()->json([
-            'interval' => $interval,
-            'data' => $chartData
-        ]);
     }
 
-    /**
-     * Get current 4-hour time bucket
-     */
     private function getCurrentTimeBucket()
     {
-        $hour = (int)date('H');
-        if ($hour < 4) return 'h4';
-        if ($hour < 8) return 'h8';
-        if ($hour < 12) return 'h12';
-        if ($hour < 16) return 'h16';
-        if ($hour < 20) return 'h20';
+        $hour = (int) date('H');
+        if ($hour < 4)
+            return 'h4';
+        if ($hour < 8)
+            return 'h8';
+        if ($hour < 12)
+            return 'h12';
+        if ($hour < 16)
+            return 'h16';
+        if ($hour < 20)
+            return 'h20';
         return 'h24';
     }
 
-    /**
-     * Get current day bucket
-     */
     private function getCurrentDayBucket()
     {
-        return strtolower(date('D')); // mon, tue, wed, thu, fri, sat, sun
+        return strtolower(date('D'));
     }
 
-    /**
-     * Get current week bucket (1-4)
-     */
     private function getCurrentWeekBucket()
     {
-        $day = (int)date('j'); // Day of month
-        if ($day <= 7) return 'week1';
-        if ($day <= 14) return 'week2';
-        if ($day <= 21) return 'week3';
-        return 'week4'; // Days 22-31
+        $day = (int) date('j');
+        if ($day <= 7)
+            return 'week1';
+        if ($day <= 14)
+            return 'week2';
+        if ($day <= 21)
+            return 'week3';
+        return 'week4';
     }
 
-    /**
-     * Get current month bucket
-     */
     private function getCurrentMonthBucket()
     {
-        return strtolower(date('M')); // jan, feb, mar, etc.
+        return strtolower(date('M'));
     }
 
-    /**
-     * Get field names for interval
-     */
     private function getFieldsForInterval($interval)
     {
         switch ($interval) {
@@ -252,9 +222,6 @@ class ConsumptionController extends Controller
         }
     }
 
-    /**
-     * Get time labels for interval
-     */
     private function getTimeLabelsForInterval($interval)
     {
         switch ($interval) {
@@ -271,9 +238,6 @@ class ConsumptionController extends Controller
         }
     }
 
-    /**
-     * Helper: Get database field name based on interval (legacy)
-     */
     private function getFieldForInterval($interval)
     {
         switch ($interval) {
@@ -289,9 +253,6 @@ class ConsumptionController extends Controller
         }
     }
 
-    /**
-     * Helper: Get table name from load type
-     */
     private function getTableForLoadType($load_type)
     {
         $tables = [
@@ -302,5 +263,178 @@ class ConsumptionController extends Controller
         ];
 
         return $tables[$load_type] ?? null;
+    }
+
+    public function checkReset(Request $request)
+    {
+        $conn = $this->getDbConnection();
+
+        if (!$conn) {
+            return response()->json(['error' => 'Database connection failed'], 500);
+        }
+
+        try {
+            $checkTable = $conn->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='reset_logs'");
+            $checkTable->execute();
+            $tableExists = $checkTable->fetch();
+
+            if (!$tableExists) {
+                $sql = "CREATE TABLE reset_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    reset_type VARCHAR(50) UNIQUE NOT NULL,
+                    last_reset_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )";
+                $conn->exec($sql);
+
+                $now = date('Y-m-d H:i:s');
+                $stmt = $conn->prepare("INSERT INTO reset_logs (reset_type, last_reset_at) VALUES (?, ?)");
+                foreach (['daily', 'weekly', 'monthly', 'yearly'] as $type) {
+                    $stmt->execute([$type, $now]);
+                }
+            }
+
+            $resetsPerformed = [];
+            $errors = [];
+
+            $todayStart = strtotime('today midnight');
+            if ($this->shouldReset($conn, 'daily', $todayStart)) {
+                if ($this->performDailyReset($conn)) {
+                    $this->updateLastReset($conn, 'daily');
+                    $resetsPerformed[] = 'daily';
+                } else {
+                    $errors[] = 'Daily reset failed';
+                }
+            }
+
+            $weekStart = strtotime('monday this week midnight');
+            if ($this->shouldReset($conn, 'weekly', $weekStart)) {
+                if ($this->performWeeklyReset($conn)) {
+                    $this->updateLastReset($conn, 'weekly');
+                    $resetsPerformed[] = 'weekly';
+                } else {
+                    $errors[] = 'Weekly reset failed';
+                }
+            }
+
+            $monthStart = strtotime('first day of this month midnight');
+            if ($this->shouldReset($conn, 'monthly', $monthStart)) {
+                if ($this->performMonthlyReset($conn)) {
+                    $this->updateLastReset($conn, 'monthly');
+                    $resetsPerformed[] = 'monthly';
+                } else {
+                    $errors[] = 'Monthly reset failed';
+                }
+            }
+
+            $yearStart = strtotime('first day of january this year midnight');
+            if ($this->shouldReset($conn, 'yearly', $yearStart)) {
+                if ($this->performYearlyReset($conn)) {
+                    $this->updateLastReset($conn, 'yearly');
+                    $resetsPerformed[] = 'yearly';
+                } else {
+                    $errors[] = 'Yearly reset failed';
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'resets_performed' => $resetsPerformed,
+                'errors' => $errors,
+                'timestamp' => now()->toIso8601String()
+            ]);
+        } catch (PDOException $e) {
+            return response()->json(['error' => 'Error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    private function shouldReset($conn, $type, $thresholdTimestamp)
+    {
+        try {
+            $stmt = $conn->prepare("SELECT last_reset_at FROM reset_logs WHERE reset_type = ?");
+            $stmt->execute([$type]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($result) {
+                $lastReset = strtotime($result['last_reset_at']);
+                return $lastReset < $thresholdTimestamp;
+            }
+            return true;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function updateLastReset($conn, $type)
+    {
+        try {
+            $now = date('Y-m-d H:i:s');
+            $stmt = $conn->prepare("UPDATE reset_logs SET last_reset_at = ? WHERE reset_type = ?");
+            $stmt->execute([$now, $type]);
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function performDailyReset($conn)
+    {
+        try {
+            $tables = ['light_loads', 'medium_loads', 'heavy_loads', 'universal_loads'];
+            foreach ($tables as $table) {
+                $sql = "UPDATE {$table} SET
+                    h4 = 0, h8 = 0, h12 = 0, h16 = 0, h20 = 0, h24 = 0,
+                    eu_daily = 0, ec_daily = 0";
+                $conn->exec($sql);
+            }
+            return true;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function performWeeklyReset($conn)
+    {
+        try {
+            $tables = ['light_loads', 'medium_loads', 'heavy_loads', 'universal_loads'];
+            foreach ($tables as $table) {
+                $sql = "UPDATE {$table} SET
+                    mon = 0, tue = 0, wed = 0, thu = 0, fri = 0, sat = 0, sun = 0";
+                $conn->exec($sql);
+            }
+            return true;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function performMonthlyReset($conn)
+    {
+        try {
+            $tables = ['light_loads', 'medium_loads', 'heavy_loads', 'universal_loads'];
+            foreach ($tables as $table) {
+                $sql = "UPDATE {$table} SET
+                    week1 = 0, week2 = 0, week3 = 0, week4 = 0,
+                    eu_monthly = 0, ec_monthly = 0";
+                $conn->exec($sql);
+            }
+            return true;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function performYearlyReset($conn)
+    {
+        try {
+            $tables = ['light_loads', 'medium_loads', 'heavy_loads', 'universal_loads'];
+            foreach ($tables as $table) {
+                $sql = "UPDATE {$table} SET
+                    jan = 0, feb = 0, mar = 0, apr = 0, may = 0, jun = 0,
+                    jul = 0, aug = 0, sep = 0, oct = 0, nov = 0, dec = 0";
+                $conn->exec($sql);
+            }
+            return true;
+        } catch (PDOException $e) {
+            return false;
+        }
     }
 }

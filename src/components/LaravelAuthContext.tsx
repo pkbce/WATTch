@@ -70,7 +70,7 @@ export const LaravelAuthProvider = ({ children }: { children: ReactNode }) => {
     const refreshUser = async () => {
         if (!token) return;
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/auth/profile', {
+            const response = await fetch('https://jwt-prod.up.railway.app/api/auth/profile', {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Accept': 'application/json',

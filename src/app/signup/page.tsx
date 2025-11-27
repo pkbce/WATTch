@@ -85,7 +85,7 @@ export default function SignupPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       // 1. Register User
-      const registerResponse = await fetch('http://127.0.0.1:8000/api/auth/register', {
+      const registerResponse = await fetch('https://jwt-prod.up.railway.app/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -102,9 +102,30 @@ export default function SignupPage() {
       }
 
       // 2. Create Database
-      const createDbResponse = await fetch('http://127.0.0.1:8000/api/create_db', {
+      // 1.5 Login to get token for create_db
+      const loginResponse = await fetch('https://jwt-prod.up.railway.app/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: values.email,
+          password: values.password,
+        }),
+      });
+
+      if (!loginResponse.ok) {
+        throw new Error('Login failed after registration');
+      }
+
+      const loginData = await loginResponse.json();
+      const token = loginData.access_token;
+
+      // 2. Create Database
+      const createDbResponse = await fetch('https://jwt-prod.up.railway.app/api/create_db', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           name: values.username,
         }),

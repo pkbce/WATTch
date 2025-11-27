@@ -81,7 +81,7 @@ export default function LoginPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/auth/login', {
+      const response = await fetch('https://jwt-prod.up.railway.app/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
@@ -100,7 +100,7 @@ export default function LoginPage() {
       const token = data.access_token;
 
       // Fetch user profile
-      const profileResponse = await fetch('http://127.0.0.1:8000/api/auth/profile', {
+      const profileResponse = await fetch('https://jwt-prod.up.railway.app/api/auth/profile', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

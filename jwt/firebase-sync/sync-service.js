@@ -10,7 +10,7 @@ const CONFIG = {
     laravelApiUrl: process.env.LARAVEL_API_URL || 'http://127.0.0.1:8000/api',
 
     // Firebase Database URL (from Firebase Console)
-    firebaseDatabaseUrl: process.env.FIREBASE_DATABASE_URL || 'https://your-project.firebaseio.com',
+    firebaseDatabaseUrl: process.env.FIREBASE_DATABASE_URL || 'https://wattch-48f16-default-rtdb.asia-southeast1.firebasedatabase.app',
 
     // User database name in MySQL
     userDatabase: process.env.DEFAULT_USER_DB || 'admin',
@@ -166,6 +166,22 @@ setInterval(() => {
         console.log(`  ${espId}: ${syncState.lastPowerValue[espId]}W (last sync ${lastSync}s ago)`);
     });
     console.log('='.repeat(50) + '\n');
+}, 60000);
+
+// Check for resets every minute
+setInterval(async () => {
+    try {
+        const response = await axios.post(
+            `${CONFIG.laravelApiUrl}/consumption/check-reset`,
+            { name: CONFIG.userDatabase },
+            { timeout: 5000 }
+        );
+        if (response.data.resets_performed && response.data.resets_performed.length > 0) {
+            log('✓ Performed resets:', response.data.resets_performed.join(', '));
+        }
+    } catch (error) {
+        console.error('✗ Reset check failed:', error.message);
+    }
 }, 60000);
 
 // Handle graceful shutdown

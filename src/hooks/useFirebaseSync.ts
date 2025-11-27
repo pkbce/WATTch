@@ -59,7 +59,7 @@ export function useFirebaseSync(
         durationSeconds: number
     ) => {
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/consumption/sync-firebase', {
+            const response = await fetch('https://jwt-prod.up.railway.app/api/consumption/sync-firebase', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
