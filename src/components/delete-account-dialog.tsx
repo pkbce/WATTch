@@ -37,7 +37,7 @@ export function DeleteAccountDialog({ children }: { children: React.ReactNode })
 
     setLoading(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/auth/delete-account', {
+      const response = await fetch('https://wattch-beta.vercel.app/api/auth/delete-account', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

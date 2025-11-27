@@ -106,10 +106,10 @@ export function DashboardClient() {
     const fetchSockets = async () => {
       try {
         const [ll, ml, hl, ul] = await Promise.all([
-          fetch(`http://127.0.0.1:8000/api/ll_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
-          fetch(`http://127.0.0.1:8000/api/ml_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
-          fetch(`http://127.0.0.1:8000/api/hl_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
-          fetch(`http://127.0.0.1:8000/api/ul_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`https://wattch-beta.vercel.app/api/ll_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`https://wattch-beta.vercel.app/api/ml_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`https://wattch-beta.vercel.app/api/hl_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`https://wattch-beta.vercel.app/api/ul_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
         ]);
 
         // Map Laravel data to Socket interface
@@ -206,7 +206,7 @@ export function DashboardClient() {
         loadType === 'heavy' ? 'hl_add_socket' : 'ul_add_socket';
 
     try {
-      await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
+      await fetch(`https://wattch-beta.vercel.app/api/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -251,7 +251,7 @@ export function DashboardClient() {
         loadType === 'heavy' ? 'hl_delete_row' : 'ul_delete_row';
 
     try {
-      await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
+      await fetch(`https://wattch-beta.vercel.app/api/${endpoint}`, {
         method: 'DELETE', // Laravel route says DELETE
         headers: {
           'Content-Type': 'application/json',
@@ -361,7 +361,7 @@ export function DashboardClient() {
         loadType === 'heavy' ? 'hl_reset_consumption' : 'ul_reset_consumption';
 
     try {
-      await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
+      await fetch(`https://wattch-beta.vercel.app/api/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -427,7 +427,7 @@ export function DashboardClient() {
           const updateConsumption = (socketId: string, power: number) => {
             if (!user) return;
 
-            fetch(`http://127.0.0.1:8000/api/consumption/sync-firebase`, {
+            fetch(`https://wattch-beta.vercel.app/api/consumption/sync-firebase`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

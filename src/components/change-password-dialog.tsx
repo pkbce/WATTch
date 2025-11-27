@@ -50,7 +50,7 @@ export function ChangePasswordDialog({ children }: { children: React.ReactNode }
 
     setLoading(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/auth/change-password', {
+      const response = await fetch('https://wattch-beta.vercel.app/api/auth/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

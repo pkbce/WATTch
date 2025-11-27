@@ -40,7 +40,7 @@ export function ChangeUsernameDialog({ children }: { children: React.ReactNode }
 
     setLoading(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/change-username', {
+      const response = await fetch('https://wattch-beta.vercel.app/api/change-username', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

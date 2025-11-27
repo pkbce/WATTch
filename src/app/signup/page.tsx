@@ -89,7 +89,7 @@ export default function SignupPage() {
     setIsLoading(true);
     try {
       // 1. Register User
-      const registerResponse = await fetch('http://127.0.0.1:8000/api/auth/register', {
+      const registerResponse = await fetch('https://wattch-beta.vercel.app/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -107,7 +107,7 @@ export default function SignupPage() {
 
       // 2. Create Database
       // 1.5 Login to get token for create_db
-      const loginResponse = await fetch('http://127.0.0.1:8000/api/auth/login', {
+      const loginResponse = await fetch('https://wattch-beta.vercel.app/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -124,7 +124,7 @@ export default function SignupPage() {
       const token = loginData.access_token;
 
       // 2. Create Database
-      const createDbResponse = await fetch('http://127.0.0.1:8000/api/create_db', {
+      const createDbResponse = await fetch('https://wattch-beta.vercel.app/api/create_db', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
