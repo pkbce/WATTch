@@ -37,7 +37,7 @@ interface LoadCardProps {
     appliances: string[];
   };
   onTogglePower: (socketId: string) => void;
-  onAddSocket: (name: string, id: string) => void;
+  onAddSocket: (name: string) => void;
   onUpdateSocketName: (socketId: string, newName: string) => void;
   onRemoveSocket: (socketId: string) => void;
   idPrefix: string;
@@ -62,25 +62,13 @@ export function LoadCard({
   const [hasReceived, setHasReceived] = useState(false);
   const [timer, setTimer] = useState<NodeJS.Timeout | null>(null);
 
-  const nextSocketId = useMemo(() => {
-    if (sockets.length === 0) {
-      return `${idPrefix}00`;
-    }
-    const lastId = sockets.reduce((maxId, socket) => {
-      return socket.id > maxId ? socket.id : maxId;
-    }, sockets[0].id);
-
-    const lastNumber = parseInt(lastId.slice(2), 10);
-    const newNumber = lastNumber + 1;
-    return `${idPrefix}${newNumber.toString().padStart(2, '0')}`;
-  }, [sockets, idPrefix]);
 
   useEffect(() => {
-    if (currentSocketIndex >= sockets.length && sockets.length > 0) {
+    // Reset index if it's out of bounds
+    if (sockets.length > 0 && currentSocketIndex >= sockets.length) {
       setCurrentSocketIndex(0);
-    } else if (sockets.length === 0) {
     }
-  }, [sockets, currentSocketIndex]);
+  }, [sockets.length, currentSocketIndex]);
 
   const handleNextSocket = () => {
     setCurrentSocketIndex((prev) => (prev + 1) % sockets.length);
@@ -91,7 +79,9 @@ export function LoadCard({
   };
 
 
-  const currentSocket = sockets.length > 0 ? sockets[currentSocketIndex] : null;
+  const currentSocket = sockets.length > 0 && currentSocketIndex < sockets.length
+    ? sockets[currentSocketIndex]
+    : null;
   const latestConsumption = currentSocket ? currentSocket.currentPower : 0;
 
   // Track data reception and timer for label
@@ -189,7 +179,7 @@ export function LoadCard({
       {cardHeader}
       <CardContent className="flex-1 flex flex-col justify-center items-center">
         <p className="text-muted-foreground mb-4">No sockets available.</p>
-        <AddSocketDialog onAddSocket={onAddSocket} nextSocketId={nextSocketId}>
+        <AddSocketDialog onAddSocket={onAddSocket}>
           <Button className="dark:text-foreground text-black hover:bg-muted dark:hover:bg-accent">
             <Plus className="w-4 h-4 mr-2" />
             Add Socket
@@ -306,7 +296,7 @@ export function LoadCard({
             <Power className="w-4 h-4 mr-2" />
             {currentSocket!.isPoweredOn ? "ON" : "OFF"}
           </Button>
-          <AddSocketDialog onAddSocket={onAddSocket} nextSocketId={nextSocketId}>
+          <AddSocketDialog onAddSocket={onAddSocket}>
             <Button variant="outline" size="icon" className="rounded-l-none text-black dark:text-white hover:bg-blue-400/20 hover:border-blue-400">
               <Plus className="w-4 h-4 text-black dark:text-white" />
             </Button>

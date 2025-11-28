@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useLaravelAuth } from '@/components/LaravelAuthContext';
+import { API_BASE_URL } from '../lib/config';
 
 /**
  * Custom hook to sync Firebase power readings to Laravel database
@@ -59,7 +60,7 @@ export function useFirebaseSync(
         durationSeconds: number
     ) => {
         try {
-            const response = await fetch('https://jwt-prod.up.railway.app/api/consumption/sync-firebase', {
+            const response = await fetch(`${API_BASE_URL}/consumption/sync-firebase`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

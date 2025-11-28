@@ -6,6 +6,7 @@ import { LoadCard } from '@/components/load-card';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useRealtimeDatabase } from '@/components/FirebaseContext';
 import { useLaravelAuth } from '@/components/LaravelAuthContext';
+import { API_BASE_URL } from '@/lib/config';
 
 export interface DataPoint {
   time: string;
@@ -69,9 +70,46 @@ const loadInfo = {
 
 type LoadType = 'light' | 'medium' | 'heavy' | 'universal';
 
+// Helper function to generate next available socket ID
+const generateNextSocketId = (loadType: LoadType, existingSockets: Socket[]): string | null => {
+  const baseESP = loadType === 'light' ? 'ESP1' :
+    loadType === 'medium' ? 'ESP2' :
+      loadType === 'heavy' ? 'ESP3' : 'ESP4';
+
+  // Maximum 10 sockets per type (base + _1 through _9)
+  const maxSockets = 10;
+  if (existingSockets.length >= maxSockets) {
+    return null; // Limit reached
+  }
+
+  // Get all existing IDs for this load type
+  const existingIds = new Set(existingSockets.map(s => s.id));
+
+  // Check if base ID is available
+  if (!existingIds.has(baseESP)) {
+    return baseESP;
+  }
+
+  // Check for available sub-IDs (_1 through _9)
+  for (let i = 1; i <= 9; i++) {
+    const id = `${baseESP}_${i}`;
+    if (!existingIds.has(id)) {
+      return id;
+    }
+  }
+
+  return null; // All slots taken
+};
+
+// Helper function to get base ESP ID from socket ID
+const getBaseEspId = (socketId: string): string => {
+  // ESP1_1 -> ESP1, ESP2_3 -> ESP2, etc.
+  return socketId.split('_')[0];
+};
+
 export function DashboardClient() {
-  const { data, updateRelay, setPower } = useRealtimeDatabase();
-  const { user, token } = useLaravelAuth(); // Added Laravel auth
+  const { user, token } = useLaravelAuth();
+  const { data, updateRelay, setPower, addDevice, removeDevice } = useRealtimeDatabase();
   const [sockets, setSockets] = useState<Record<LoadType, Socket[]>>({
     light: [],
     medium: [],
@@ -106,10 +144,10 @@ export function DashboardClient() {
     const fetchSockets = async () => {
       try {
         const [ll, ml, hl, ul] = await Promise.all([
-          fetch(`https://wattch-beta.vercel.app/api/ll_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
-          fetch(`https://wattch-beta.vercel.app/api/ml_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
-          fetch(`https://wattch-beta.vercel.app/api/hl_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
-          fetch(`https://wattch-beta.vercel.app/api/ul_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`${API_BASE_URL}/ll_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`${API_BASE_URL}/ml_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`${API_BASE_URL}/hl_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+          fetch(`${API_BASE_URL}/ul_db_route`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
         ]);
 
         // Map Laravel data to Socket interface
@@ -118,22 +156,18 @@ export function DashboardClient() {
 
         const mapToSocket = (dbSockets: any[], loadType: LoadType): Socket[] => {
           return dbSockets.map((s: any) => {
-            // Determine ESP ID based on load type (mapping logic)
-            const espId = loadType === 'light' ? 'ESP1' :
-              loadType === 'medium' ? 'ESP2' :
-                loadType === 'heavy' ? 'ESP3' : 'ESP4';
-
-            // Get initial state from Firebase data if available
+            // Get initial state from Firebase data using socket's own ID
             let initialRelay = s.power_status === 1; // Default to DB
             let initialPower = 0;
 
             const currentData = dataRef.current;
-            if (currentData && currentData[espId]) {
-              initialRelay = currentData[espId].relay;
-              initialPower = currentData[espId].power;
-              // Also update ref to prevent duplicate processing
-              if (lastReadings.current[espId] === null) {
-                lastReadings.current[espId] = initialPower;
+            // Read from socket's own Firebase path (ESP1_1, ESP1_2, etc.)
+            if (currentData && currentData[s.socket_id]) {
+              initialRelay = currentData[s.socket_id].relay;
+              initialPower = currentData[s.socket_id].power;
+              // Initialize tracking for this socket ID
+              if (!lastReadings.current[s.socket_id]) {
+                lastReadings.current[s.socket_id] = initialPower;
               }
             }
 
@@ -177,16 +211,28 @@ export function DashboardClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, token]);
 
-  // Reset power values to 0 on component mount (Firebase)
+  // Reset power values to 0 on component mount (Firebase) for all sockets
   useEffect(() => {
     const resetPowerValues = async () => {
-      await setPower('ESP1', 0);
-      await setPower('ESP2', 0);
-      await setPower('ESP3', 0);
-      await setPower('ESP4', 0);
+      // Wait for sockets to be loaded first
+      if (!socketsLoaded) return;
+
+      // Get all socket IDs across all load types
+      const allSocketIds: string[] = [];
+      (['light', 'medium', 'heavy', 'universal'] as LoadType[]).forEach(loadType => {
+        sockets[loadType].forEach(socket => {
+          allSocketIds.push(socket.id);
+        });
+      });
+
+      // Reset power for each socket in Firebase
+      for (const socketId of allSocketIds) {
+        await setPower(socketId, 0);
+      }
     };
+
     resetPowerValues();
-  }, []);
+  }, [socketsLoaded]); // Only run when sockets are loaded
 
   useEffect(() => {
     if (permission === 'default') {
@@ -199,28 +245,39 @@ export function DashboardClient() {
   }, [sockets, permission, showNotification]);
 
 
-  const addSocket = async (loadType: LoadType, name: string, id: string) => {
+  const addSocket = async (loadType: LoadType, name: string) => {
     if (!user) return;
+
+    // Generate next available ID
+    const socketId = generateNextSocketId(loadType, sockets[loadType]);
+    if (!socketId) {
+      alert(`Maximum socket limit reached for ${loadType} load (10 sockets max)`);
+      return;
+    }
+
     const endpoint = loadType === 'light' ? 'll_add_socket' :
       loadType === 'medium' ? 'ml_add_socket' :
         loadType === 'heavy' ? 'hl_add_socket' : 'ul_add_socket';
 
     try {
-      await fetch(`https://wattch-beta.vercel.app/api/${endpoint}`, {
+      // Add to Firebase
+      await addDevice(socketId);
+
+      // Add to Laravel backend
+      await fetch(`${API_BASE_URL}/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ socket_id: id, socket_name: name }),
+        body: JSON.stringify({ socket_id: socketId, socket_name: name }),
       });
-      // Refresh sockets
-      // For now, just reload page or re-fetch. Re-fetching is better but complex to trigger from here without extracting fetch logic.
-      // I'll manually update state for responsiveness.
+
+      // Update local state
       setSockets(prev => ({
         ...prev,
         [loadType]: [...prev[loadType], {
-          id,
+          id: socketId,
           name,
           data: [],
           isPoweredOn: false,
@@ -231,6 +288,8 @@ export function DashboardClient() {
       }));
     } catch (e) {
       console.error("Add socket failed", e);
+      // Rollback Firebase if backend fails
+      await removeDevice(socketId);
     }
   }
 
@@ -251,20 +310,28 @@ export function DashboardClient() {
         loadType === 'heavy' ? 'hl_delete_row' : 'ul_delete_row';
 
     try {
-      await fetch(`https://wattch-beta.vercel.app/api/${endpoint}`, {
-        method: 'DELETE', // Laravel route says DELETE
+      // Remove from Firebase
+      await removeDevice(socketId);
+
+      // Remove from Laravel backend
+      await fetch(`${API_BASE_URL}/${endpoint}`, {
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ socket_id: socketId }),
       });
+
+      // Update local state
       setSockets(prev => ({
         ...prev,
         [loadType!]: prev[loadType!].filter(s => s.id !== socketId)
       }));
     } catch (e) {
       console.error("Remove socket failed", e);
+      // Rollback Firebase if backend fails
+      await addDevice(socketId);
     }
   }
 
@@ -286,20 +353,15 @@ export function DashboardClient() {
 
     if (!loadType) return;
 
-    // Map load type to ESP device
-    const espDevice = loadType === 'light' ? 'ESP1' :
-      loadType === 'medium' ? 'ESP2' :
-        loadType === 'heavy' ? 'ESP3' : 'ESP4';
-
-    // 1. Update Firebase relay for the corresponding ESP device
-    updateRelay(espDevice, newStatus);
+    // Update Firebase relay for this specific socket ID
+    updateRelay(socketId, newStatus);
 
     // 2. Update Laravel database for this specific socket
     const endpoint = loadType === 'light' ? 'll_change_power_status' :
       loadType === 'medium' ? 'ml_change_power_status' :
         loadType === 'heavy' ? 'hl_change_power_status' : 'ul_change_power_status';
 
-    await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
+    await fetch(`${API_BASE_URL}/${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -324,7 +386,7 @@ export function DashboardClient() {
       loadType === 'medium' ? 'ml_change_socket_name' :
         loadType === 'heavy' ? 'hl_change_socket_name' : 'ul_change_socket_name';
 
-    await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
+    await fetch(`${API_BASE_URL}/${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -361,7 +423,7 @@ export function DashboardClient() {
         loadType === 'heavy' ? 'hl_reset_consumption' : 'ul_reset_consumption';
 
     try {
-      await fetch(`https://wattch-beta.vercel.app/api/${endpoint}`, {
+      await fetch(`${API_BASE_URL}/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -416,104 +478,87 @@ export function DashboardClient() {
 
         const newSockets = { ...prevSockets };
 
-        const updateSocketData = (loadType: LoadType, espId: string) => {
-          const espData = data[espId];
-          if (!espData) return;
+        const updateSocketData = (socket: Socket, loadType: LoadType) => {
+          // Read from socket's own Firebase path (ESP1_1, ESP1_2, etc.)
+          const espData = data[socket.id];
+          if (!espData) return null;
 
           const incomingPower = espData.power;
           const isPoweredOn = espData.relay;
 
           // Helper to update consumption via proper sync endpoint
+          // Helper to update consumption via proper sync endpoint
           const updateConsumption = (socketId: string, power: number) => {
+            // Sync is now handled by the background service (jwt/firebase-sync/sync-service.js)
+            // We do NOT sync from frontend to avoid double counting and ensure background updates
             if (!user) return;
-
-            fetch(`https://wattch-beta.vercel.app/api/consumption/sync-firebase`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                // Note: sync-firebase is NOT authenticated in api.php yet to support Node service
-                // But if we wanted to support it from frontend, we could add auth.
-                // For now, we keep sending 'name' because the route expects it (it's not in auth:api group)
-              },
-              body: JSON.stringify({
-                name: user.name,
-                load_type: loadType, // 'light', 'medium', 'heavy', 'universal'
-                socket_id: socketId,
-                power: power, // Current power in Watts
-                duration_seconds: 1 // How long this reading lasted (1 second intervals)
-              }),
-            })
+            // console.log('Frontend sync skipped for', socketId);
           };
 
-          // Check if this is the first load for this ESP device or first sync
-          if (lastReadings.current[espId] === null || !hasInitialSync.current) {
-            lastReadings.current[espId] = incomingPower;
+          // Check if this is the first load for this socket or first sync
+          if (lastReadings.current[socket.id] === null || !hasInitialSync.current) {
+            lastReadings.current[socket.id] = incomingPower;
 
-            // Update all sockets in this load type with initial state
-            newSockets[loadType] = newSockets[loadType].map(socket => {
-              // Send initial consumption update
-              updateConsumption(socket.id, incomingPower);
+            // Send initial consumption update
+            updateConsumption(socket.id, incomingPower);
 
-              return {
-                ...socket,
-                isPoweredOn,
-                currentPower: incomingPower,
-                lastUpdated: Date.now(),
-                isOnline: true,
-                // Only add data point if we have power (and it's not a duplicate if we want strict history)
-                // But for initial load, showing current state is good.
-                data: incomingPower > 0 ? [{
-                  time: new Date().toLocaleTimeString(),
-                  consumption: incomingPower
-                }] : [],
-              };
-            });
-            return;
-          }
-
-          // Always update current state only for this load type
-          const previousRealPower = lastReadings.current[espId];
-          const powerChanged = incomingPower !== previousRealPower;
-          const relayChanged = isPoweredOn !== newSockets[loadType][0].isPoweredOn;
-          const hasChanged = powerChanged || relayChanged;
-
-          if (hasChanged) {
-            lastReadings.current[espId] = incomingPower;
-          }
-
-          newSockets[loadType] = newSockets[loadType].map(socket => {
-            let newData = socket.data;
-            // Add a new data point on every update, but skip if it's a duplicate of the last value
-            const isDuplicate = socket.data.length > 0 && socket.data[socket.data.length - 1].consumption === incomingPower;
-            if (!isDuplicate) {
-              const newDataPoint = {
-                time: new Date().toLocaleTimeString(),
-                consumption: incomingPower
-              };
-              newData = [...socket.data, newDataPoint];
-              if (newData.length > 15) {
-                newData = newData.slice(newData.length - 15);
-              }
-            }
-            // Update Laravel with new consumption for each socket if power changed
-            if (powerChanged) {
-              updateConsumption(socket.id, incomingPower);
-            }
             return {
               ...socket,
               isPoweredOn,
               currentPower: incomingPower,
               lastUpdated: Date.now(),
               isOnline: true,
-              data: newData
+              data: incomingPower > 0 ? [{
+                time: new Date().toLocaleTimeString(),
+                consumption: incomingPower
+              }] : [],
             };
-          });
+          }
+
+          // Check for changes
+          const previousRealPower = lastReadings.current[socket.id] || 0;
+          const powerChanged = incomingPower !== previousRealPower;
+          const relayChanged = isPoweredOn !== socket.isPoweredOn;
+          const hasChanged = powerChanged || relayChanged;
+
+          if (hasChanged) {
+            lastReadings.current[socket.id] = incomingPower;
+          }
+
+          let newData = socket.data;
+          const isDuplicate = socket.data.length > 0 && socket.data[socket.data.length - 1].consumption === incomingPower;
+          if (!isDuplicate) {
+            const newDataPoint = {
+              time: new Date().toLocaleTimeString(),
+              consumption: incomingPower
+            };
+            newData = [...socket.data, newDataPoint];
+            if (newData.length > 15) {
+              newData = newData.slice(newData.length - 15);
+            }
+          }
+
+          if (powerChanged) {
+            updateConsumption(socket.id, incomingPower);
+          }
+
+          return {
+            ...socket,
+            isPoweredOn,
+            currentPower: incomingPower,
+            lastUpdated: Date.now(),
+            isOnline: true,
+            data: newData
+          };
         };
 
-        updateSocketData('light', 'ESP1');
-        updateSocketData('medium', 'ESP2');
-        updateSocketData('heavy', 'ESP3');
-        updateSocketData('universal', 'ESP4');
+        // Update all sockets across all load types
+        (['light', 'medium', 'heavy', 'universal'] as LoadType[]).forEach(loadType => {
+          newSockets[loadType] = newSockets[loadType].map(socket => {
+            const updated = updateSocketData(socket, loadType);
+            return updated || socket; // Return updated socket or original if no Firebase data
+          });
+        });
 
         hasInitialSync.current = true;
         return newSockets;
@@ -563,7 +608,7 @@ export function DashboardClient() {
         chartColor="hsl(120 100% 35%)"
         loadInfo={loadInfo.light}
         onTogglePower={toggleSocketPower}
-        onAddSocket={(name, id) => addSocket('light', name, id)}
+        onAddSocket={(name) => addSocket('light', name)}
         onUpdateSocketName={updateSocketName}
         onRemoveSocket={removeSocket}
         idPrefix="ESP"
@@ -576,7 +621,7 @@ export function DashboardClient() {
         chartColor="#F1C40F"
         loadInfo={loadInfo.medium}
         onTogglePower={toggleSocketPower}
-        onAddSocket={(name, id) => addSocket('medium', name, id)}
+        onAddSocket={(name) => addSocket('medium', name)}
         onUpdateSocketName={updateSocketName}
         onRemoveSocket={removeSocket}
         idPrefix="ESP"
@@ -589,7 +634,7 @@ export function DashboardClient() {
         chartColor="hsl(25 95% 53%)"
         loadInfo={loadInfo.heavy}
         onTogglePower={toggleSocketPower}
-        onAddSocket={(name, id) => addSocket('heavy', name, id)}
+        onAddSocket={(name) => addSocket('heavy', name)}
         onUpdateSocketName={updateSocketName}
         onRemoveSocket={removeSocket}
         idPrefix="ESP"
@@ -602,7 +647,7 @@ export function DashboardClient() {
         chartColor="#3498db"
         loadInfo={loadInfo.universal}
         onTogglePower={toggleSocketPower}
-        onAddSocket={(name, id) => addSocket('universal', name, id)}
+        onAddSocket={(name) => addSocket('universal', name)}
         onUpdateSocketName={updateSocketName}
         onRemoveSocket={removeSocket}
         idPrefix="ESP"

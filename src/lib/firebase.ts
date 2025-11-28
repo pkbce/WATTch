@@ -4,13 +4,13 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDLUC4aMBsSNiOxCCQI9Kxcjx5y_z_4JSo",
-  authDomain: "wattch-52370.firebaseapp.com",
-  databaseURL: "https://wattch-52370-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "wattch-52370",
-  storageBucket: "wattch-52370.firebasestorage.app",
-  messagingSenderId: "969151073885",
-  appId: "1:969151073885:web:3ec56de0eb453093a0c7b4"
+  apiKey: "AIzaSyC01aJFD58_r0RPcoxz7NaMOcoWy5OrHbo",
+  authDomain: "wattch-48f16.firebaseapp.com",
+  databaseURL: "https://wattch-48f16-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "wattch-48f16",
+  storageBucket: "wattch-48f16.firebasestorage.app",
+  messagingSenderId: "212395242879",
+  appId: "1:212395242879:web:64cce8a5f546bb53bcd64a"
 };
 
 const app = initializeApp(firebaseConfig);

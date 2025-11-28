@@ -1,8 +1,8 @@
 'use client';
-'use client';
 
 import { useState, useEffect } from 'react';
 import { useLaravelAuth } from '@/components/LaravelAuthContext';
+import { API_BASE_URL } from '../lib/config';
 
 type Interval = '1D' | '1W' | '1M' | '1Y';
 
@@ -36,7 +36,7 @@ export function useConsumptionData(interval: Interval) {
 
             try {
                 const response = await fetch(
-                    `https://jwt-prod.up.railway.app/api/consumption/history?interval=${interval}`,
+                    `${API_BASE_URL}/consumption/history?interval=${interval}`,
                     {
                         headers: {
                             'Authorization': `Bearer ${token}`,

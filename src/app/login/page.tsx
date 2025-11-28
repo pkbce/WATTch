@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useLaravelAuth } from '@/components/LaravelAuthContext';
+import { API_BASE_URL } from '@/lib/config';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -84,7 +85,7 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      const response = await fetch('https://wattch-beta.vercel.app/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
@@ -103,7 +104,7 @@ export default function LoginPage() {
       const token = data.access_token;
 
       // Fetch user profile
-      const profileResponse = await fetch('https://wattch-beta.vercel.app/api/auth/profile', {
+      const profileResponse = await fetch(`${API_BASE_URL}/auth/profile`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -18,16 +18,15 @@ import { Label } from './ui/label';
 
 interface AddSocketDialogProps {
   children: React.ReactNode;
-  onAddSocket: (name: string, id: string) => void;
-  nextSocketId: string;
+  onAddSocket: (name: string) => void;
 }
 
-export function AddSocketDialog({ children, onAddSocket, nextSocketId }: AddSocketDialogProps) {
+export function AddSocketDialog({ children, onAddSocket }: AddSocketDialogProps) {
   const [name, setName] = useState('');
 
   const handleSave = () => {
     if (name) {
-      onAddSocket(name, nextSocketId);
+      onAddSocket(name);
       setName('');
     }
   };
@@ -39,16 +38,16 @@ export function AddSocketDialog({ children, onAddSocket, nextSocketId }: AddSock
         <DialogHeader>
           <DialogTitle>Add New Socket</DialogTitle>
           <DialogDescription>
-            Enter the details for the new socket.
+            Enter a name for the new socket. The ID will be automatically assigned.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-            <Input
-              id="socket-name"
-              placeholder="Socket Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+          <Input
+            id="socket-name"
+            placeholder="Socket Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
           <p className="text-xs text-muted-foreground mt-2">
             Note: Adding sockets requires the assistance of a professional. Do not attempt unless you have technical experience.
           </p>

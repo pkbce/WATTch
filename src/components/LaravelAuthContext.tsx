@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { API_BASE_URL } from '@/lib/config';
 
 interface User {
     id: number;
@@ -70,7 +71,7 @@ export const LaravelAuthProvider = ({ children }: { children: ReactNode }) => {
     const refreshUser = async () => {
         if (!token) return;
         try {
-            const response = await fetch('https://wattch-beta.vercel.app/api/auth/profile', {
+            const response = await fetch(`${API_BASE_URL}/auth/profile`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Accept': 'application/json',

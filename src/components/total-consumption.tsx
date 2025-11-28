@@ -213,14 +213,14 @@ export function TotalConsumption({ rate }: { rate: number }) {
                     <TableRow key={load}>
                       <TableCell className="font-medium capitalize">{load}</TableCell>
                       <TableCell className="text-right">
-                        ₱{billData.costs[index].toFixed(2)}
+                        ₱{billData.costs[index].toFixed(6)}
                       </TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="font-bold">
                     <TableCell>Total</TableCell>
                     <TableCell className="text-right">
-                      ₱{billData.totalCost.toFixed(2)}
+                      ₱{billData.totalCost.toFixed(6)}
                     </TableCell>
                   </TableRow>
                 </TableBody>

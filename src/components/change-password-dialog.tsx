@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -18,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useLaravelAuth } from '@/components/LaravelAuthContext';
+import { API_BASE_URL } from '@/lib/config';
 
 export function ChangePasswordDialog({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -50,7 +50,7 @@ export function ChangePasswordDialog({ children }: { children: React.ReactNode }
 
     setLoading(true);
     try {
-      const response = await fetch('https://wattch-beta.vercel.app/api/auth/change-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

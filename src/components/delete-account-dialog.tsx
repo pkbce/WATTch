@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useLaravelAuth } from '@/components/LaravelAuthContext';
+import { API_BASE_URL } from '@/lib/config';
 
 export function DeleteAccountDialog({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -37,7 +38,7 @@ export function DeleteAccountDialog({ children }: { children: React.ReactNode })
 
     setLoading(true);
     try {
-      const response = await fetch('https://wattch-beta.vercel.app/api/auth/delete-account', {
+      const response = await fetch(`${API_BASE_URL}/auth/delete-account`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

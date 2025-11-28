@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
-import { useLaravelAuth } from '@/components/LaravelAuthContext';
+
 
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +26,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { API_BASE_URL } from '@/lib/config';
 
 const formSchema = z
   .object({
@@ -68,7 +69,7 @@ export default function SignupPage() {
   const [isClient, setIsClient] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  const { setUser, setToken } = useLaravelAuth();
+
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -89,7 +90,7 @@ export default function SignupPage() {
     setIsLoading(true);
     try {
       // 1. Register User
-      const registerResponse = await fetch('https://wattch-beta.vercel.app/api/auth/register', {
+      const registerResponse = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -107,7 +108,7 @@ export default function SignupPage() {
 
       // 2. Create Database
       // 1.5 Login to get token for create_db
-      const loginResponse = await fetch('https://wattch-beta.vercel.app/api/auth/login', {
+      const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -124,7 +125,7 @@ export default function SignupPage() {
       const token = loginData.access_token;
 
       // 2. Create Database
-      const createDbResponse = await fetch('https://wattch-beta.vercel.app/api/create_db', {
+      const createDbResponse = await fetch(`${API_BASE_URL}/create_db`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

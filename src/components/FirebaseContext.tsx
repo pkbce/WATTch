@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set, Database, DataSnapshot } from 'firebase/database';
+import { getDatabase, ref, onValue, set, remove, Database, DataSnapshot } from 'firebase/database';
 import { useFirebaseApp } from '@/firebase/provider';
 
 interface RealtimeDatabaseContextType {
@@ -10,6 +10,8 @@ interface RealtimeDatabaseContextType {
     data: any;
     updateRelay: (path: string, status: boolean) => Promise<void>;
     setPower: (path: string, power: number) => Promise<void>;
+    addDevice: (deviceId: string) => Promise<void>;
+    removeDevice: (deviceId: string) => Promise<void>;
 }
 
 const RealtimeDatabaseContext = createContext<RealtimeDatabaseContextType>({
@@ -17,6 +19,8 @@ const RealtimeDatabaseContext = createContext<RealtimeDatabaseContextType>({
     data: null,
     updateRelay: async () => { },
     setPower: async () => { },
+    addDevice: async () => { },
+    removeDevice: async () => { },
 });
 
 export const useRealtimeDatabase = () => useContext(RealtimeDatabaseContext);
@@ -52,8 +56,23 @@ export function RealtimeDatabaseProvider({ children }: { children: ReactNode }) 
         await set(powerRef, power);
     };
 
+    const addDevice = async (deviceId: string) => {
+        if (!database) return;
+        const deviceRef = ref(database, `WATTch/${deviceId}`);
+        await set(deviceRef, {
+            relay: false,
+            power: 0
+        });
+    };
+
+    const removeDevice = async (deviceId: string) => {
+        if (!database) return;
+        const deviceRef = ref(database, `WATTch/${deviceId}`);
+        await remove(deviceRef);
+    };
+
     return (
-        <RealtimeDatabaseContext.Provider value={{ database, data, updateRelay, setPower }}>
+        <RealtimeDatabaseContext.Provider value={{ database, data, updateRelay, setPower, addDevice, removeDevice }}>
             {children}
         </RealtimeDatabaseContext.Provider>
     );
