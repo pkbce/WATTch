@@ -89,6 +89,7 @@ function ResetPasswordForm() {
         }
 
         setIsLoading(true);
+
         try {
             const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
                 method: 'POST',

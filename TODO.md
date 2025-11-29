@@ -10,3 +10,14 @@
 ## Pending Tasks
 - [ ] Verify that the label changes correctly when switching between sockets
 - [ ] Ensure timers are properly cleaned up to avoid memory leaks
+
+## APK Conversion Tasks
+- [ ] Install cross-env for Windows compatibility
+- [ ] Update build script in package.json to use cross-env
+- [ ] Configure Next.js for static export in next.config.ts
+- [ ] Update capacitor.config.ts webDir to 'out'
+- [ ] Run npm run build
+- [ ] Run npx cap copy
+- [ ] Run npx cap add android
+- [ ] Run npx cap open android
+- [ ] Build APK in Android Studio

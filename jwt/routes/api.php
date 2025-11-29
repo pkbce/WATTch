@@ -10,6 +10,8 @@ use App\Http\Controllers\Auth\SocialAuthController;
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login', [AuthController::class, 'login']);
+    Route::post('forgot-password', [ForgotPasswordController::class, 'sendResetLinkEmail']);
+    Route::post('reset-password', [ResetPasswordController::class, 'reset']);
 
 
     // Social Authentication Routes
@@ -69,14 +71,9 @@ Route::middleware('auth:api')->group(function () {
     Route::get('consumption/history', [ConsumptionController::class, 'getConsumptionHistory']);
 });
 
-Route::post('forgot-password', [ForgotPasswordController::class, 'sendResetLinkEmail']);
-Route::post('reset-password', [ResetPasswordController::class, 'reset']);
+
 
 
 // Consumption data endpoints (Public for Sync Service)
 Route::post('consumption/sync-firebase', [ConsumptionController::class, 'syncFirebaseData']);
 Route::post('consumption/check-reset', [ConsumptionController::class, 'checkReset']);
-Route::post('consumption/reset-daily', [ConsumptionController::class, 'resetDaily']);
-Route::post('consumption/reset-weekly', [ConsumptionController::class, 'resetWeekly']);
-Route::post('consumption/reset-monthly', [ConsumptionController::class, 'resetMonthly']);
-Route::post('consumption/reset-yearly', [ConsumptionController::class, 'resetYearly']);
