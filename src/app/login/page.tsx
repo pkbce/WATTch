@@ -120,10 +120,7 @@ export default function LoginPage() {
 
       login(token, user);
 
-      toast({
-        title: "Login Successful",
-        description: "Welcome back!",
-      });
+
 
     } catch (error: any) {
       console.error("Login error:", error);
