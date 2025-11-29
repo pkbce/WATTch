@@ -76,3 +76,7 @@ Route::post('reset-password', [ResetPasswordController::class, 'reset']);
 // Consumption data endpoints (Public for Sync Service)
 Route::post('consumption/sync-firebase', [ConsumptionController::class, 'syncFirebaseData']);
 Route::post('consumption/check-reset', [ConsumptionController::class, 'checkReset']);
+Route::post('consumption/reset-daily', [ConsumptionController::class, 'resetDaily']);
+Route::post('consumption/reset-weekly', [ConsumptionController::class, 'resetWeekly']);
+Route::post('consumption/reset-monthly', [ConsumptionController::class, 'resetMonthly']);
+Route::post('consumption/reset-yearly', [ConsumptionController::class, 'resetYearly']);

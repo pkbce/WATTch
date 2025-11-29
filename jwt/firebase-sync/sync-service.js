@@ -200,6 +200,47 @@ setInterval(async () => {
     }
 }, 60000);
 
+// ----- Additional reset intervals -----
+// Daily reset (runs at midnight UTC)
+setInterval(async () => {
+    try {
+        await axios.post(`${CONFIG.laravelApiUrl}/consumption/reset-daily`, { name: CONFIG.userDatabase }, { timeout: 5000 });
+        log('✓ Daily reset performed');
+    } catch (e) {
+        console.error('✗ Daily reset failed', e.message);
+    }
+}, 24 * 60 * 60 * 1000);
+
+// Weekly reset (runs every Monday at 00:00 UTC)
+setInterval(async () => {
+    try {
+        await axios.post(`${CONFIG.laravelApiUrl}/consumption/reset-weekly`, { name: CONFIG.userDatabase }, { timeout: 5000 });
+        log('✓ Weekly reset performed');
+    } catch (e) {
+        console.error('✗ Weekly reset failed', e.message);
+    }
+}, 7 * 24 * 60 * 60 * 1000);
+
+// Monthly reset (runs on the 1st of each month)
+setInterval(async () => {
+    try {
+        await axios.post(`${CONFIG.laravelApiUrl}/consumption/reset-monthly`, { name: CONFIG.userDatabase }, { timeout: 5000 });
+        log('✓ Monthly reset performed');
+    } catch (e) {
+        console.error('✗ Monthly reset failed', e.message);
+    }
+}, 30 * 24 * 60 * 60 * 1000);
+
+// Yearly reset (runs on Jan 1st)
+setInterval(async () => {
+    try {
+        await axios.post(`${CONFIG.laravelApiUrl}/consumption/reset-yearly`, { name: CONFIG.userDatabase }, { timeout: 5000 });
+        log('✓ Yearly reset performed');
+    } catch (e) {
+        console.error('✗ Yearly reset failed', e.message);
+    }
+}, 365 * 24 * 60 * 60 * 1000);
+
 // Handle graceful shutdown
 process.on('SIGINT', () => {
     console.log('\nShutting down Firebase sync service...');
