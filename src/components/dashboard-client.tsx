@@ -468,6 +468,7 @@ export function DashboardClient() {
 
   useEffect(() => {
     if (data && socketsLoaded) {
+      console.log('🔥 Firebase data updated:', data);
       setIsLoading(false);
       setSockets(prevSockets => {
         // Guard against empty sockets (race condition safety)
@@ -485,6 +486,7 @@ export function DashboardClient() {
 
           const incomingPower = espData.power;
           const isPoweredOn = espData.relay;
+          console.log(`📊 Socket ${socket.id} - Power: ${incomingPower}W, Relay: ${isPoweredOn}`);
 
           // Helper to update consumption via proper sync endpoint
           // Helper to update consumption via proper sync endpoint
