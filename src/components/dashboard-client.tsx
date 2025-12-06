@@ -246,18 +246,24 @@ export function DashboardClient() {
 
     if (permission === 'granted' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then(registration => {
+        // Calculate active sockets per load type
+        const llCount = sockets.light.filter(s => s.isPoweredOn).length;
+        const mlCount = sockets.medium.filter(s => s.isPoweredOn).length;
+        const hlCount = sockets.heavy.filter(s => s.isPoweredOn).length;
+        const ulCount = sockets.universal.filter(s => s.isPoweredOn).length;
+
         // Update the notification
         registration.showNotification('WATTch Live Status', {
-          body: `Total Load: ${totalPower.toFixed(2)} W | Active Devices: ${activeDevices}`,
+          body: `LL:${llCount} ML:${mlCount} HL:${hlCount} UL:${ulCount}`,
           tag: 'live-status', // Updates the existing notification with this tag
           icon: '/favicon.svg', // Ensure this exists or use a default
           silent: true, // Prevent sound/vibration on updates
           renotify: false, // Do not re-notify (sound/vibrate) if it already exists
-          requireInteraction: false, // Let it stay in the drawer but not force interaction
+          requireInteraction: true, // Keep notification visible until dismissed
         } as any);
       });
     }
-  }, [totalPower, activeDevices, permission, requestPermission]);
+  }, [sockets, permission, requestPermission]);
 
 
   const addSocket = async (loadType: LoadType, name: string) => {
