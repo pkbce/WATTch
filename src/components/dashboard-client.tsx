@@ -252,11 +252,15 @@ export function DashboardClient() {
         const hlCount = sockets.heavy.filter(s => s.isPoweredOn).length;
         const ulCount = sockets.universal.filter(s => s.isPoweredOn).length;
 
+        const totalActive = llCount + mlCount + hlCount + ulCount;
+        const bodyText = totalActive === 0
+          ? "No Active Sockets"
+          : `LL:${llCount} ML:${mlCount} HL:${hlCount} UL:${ulCount}`;
+
         // Update the notification
-        registration.showNotification('WATTch Live Status', {
-          body: `LL:${llCount} ML:${mlCount} HL:${hlCount} UL:${ulCount}`,
+        registration.showNotification('WATTch Active Sockets', {
+          body: bodyText,
           tag: 'live-status', // Updates the existing notification with this tag
-          icon: '/favicon.svg', // Ensure this exists or use a default
           silent: true, // Prevent sound/vibration on updates
           renotify: false, // Do not re-notify (sound/vibrate) if it already exists
           requireInteraction: true, // Keep notification visible until dismissed
