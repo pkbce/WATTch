@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set, remove, Database, DataSnapshot } from 'firebase/database';
+import { getDatabase, ref, onValue, set, remove, Database, DataSnapshot, goOnline, goOffline } from 'firebase/database';
 import { useFirebaseApp } from '@/firebase/provider';
 
 interface RealtimeDatabaseContextType {
@@ -36,12 +36,35 @@ export function RealtimeDatabaseProvider({ children }: { children: ReactNode }) 
         const db = getDatabase(app);
         setDatabase(db);
 
+
         const wattchRef = ref(db, 'WATTch');
         const unsubscribe = onValue(wattchRef, (snapshot: DataSnapshot) => {
             setData(snapshot.val());
         });
 
-        return () => unsubscribe();
+        // Connection monitoring
+        const connectedRef = ref(db, '.info/connected');
+        const unsubscribeConnected = onValue(connectedRef, (snap) => {
+            const connected = snap.val();
+            // console.log("Firebase connection status:", connected);
+        });
+
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                // console.log("App became visible, ensuring online status...");
+                // Force reconnection sequence
+                goOffline(db);
+                goOnline(db);
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        return () => {
+            unsubscribe();
+            unsubscribeConnected();
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
     }, [app]);
 
     const updateRelay = async (path: string, status: boolean) => {
