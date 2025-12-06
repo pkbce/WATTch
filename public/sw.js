@@ -17,3 +17,19 @@ self.addEventListener('message', (event) => {
     self.registration.showNotification(title, options);
   }
 });
+
+self.addEventListener('notificationclose', (event) => {
+  const notification = event.notification;
+  if (notification.tag === 'live-status') {
+    event.waitUntil(
+      self.registration.showNotification(notification.title, {
+        body: notification.body,
+        tag: notification.tag,
+        icon: notification.icon,
+        silent: true,
+        renotify: false,
+        requireInteraction: true,
+      })
+    );
+  }
+});
