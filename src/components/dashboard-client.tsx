@@ -234,15 +234,30 @@ export function DashboardClient() {
     resetPowerValues();
   }, [socketsLoaded]); // Only run when sockets are loaded
 
+  // Calculate total power for notification
+  const totalPower = Object.values(sockets).flat().reduce((acc, socket) => acc + (socket.currentPower || 0), 0);
+  const activeDevices = Object.values(sockets).flat().filter(s => s.isPoweredOn).length;
+
+  // Persistent Notification Logic
   useEffect(() => {
     if (permission === 'default') {
       requestPermission();
     }
-  }, [permission, requestPermission]);
 
-  useEffect(() => {
-    // Notification logic (simplified for brevity)
-  }, [sockets, permission, showNotification]);
+    if (permission === 'granted' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(registration => {
+        // Update the notification
+        registration.showNotification('WATTch Live Status', {
+          body: `Total Load: ${totalPower.toFixed(2)} W | Active Devices: ${activeDevices}`,
+          tag: 'live-status', // Updates the existing notification with this tag
+          icon: '/favicon.svg', // Ensure this exists or use a default
+          silent: true, // Prevent sound/vibration on updates
+          renotify: false, // Do not re-notify (sound/vibrate) if it already exists
+          requireInteraction: false, // Let it stay in the drawer but not force interaction
+        } as any);
+      });
+    }
+  }, [totalPower, activeDevices, permission, requestPermission]);
 
 
   const addSocket = async (loadType: LoadType, name: string) => {
